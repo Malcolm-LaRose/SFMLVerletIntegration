@@ -5,7 +5,7 @@
 // Profit
 
 
-#include "color.h"
+#include "Color.h"
 
 #include <GL/glew.h>
 
@@ -55,7 +55,7 @@ const sf::Vector2f& multiplyVectorByScalar(const float& scalar, const sf::Vector
 }
 
 
-float deltaTime = 0.016; // Framerate adjustable time step
+float deltaTime = 0.001; // Framerate adjustable time step
 float totalTime = 0.0;
 
 
@@ -84,24 +84,31 @@ struct Ball {
 		window.draw(ball);
 	}
 
+	const bool contains(const int& x, const int& y) const { // Checks if a point is within a ball
+		const float distX = x - (position.x);
+		const float distY = y - (position.y);
+		return (distX * distX + distY * distY) <= (radius * radius);
+	}
 
-	const sf::Vector2f& applyForce() const {
+	const sf::Vector2f& applyForce() const { // Really an acceleration
 		
 		sf::Vector2f gravity = sf::Vector2f(0.0f, 9.81f);
 		sf::Vector2f dragForce = sf::Vector2f(multiplyVectorByScalar(0.5f * drag , vectorSquared(velocity)));
 		sf::Vector2f dragAcc = sf::Vector2f(multiplyVectorByScalar(1.0f/mass, dragForce));
-		return gravity - dragAcc;
+		return gravity - dragAcc; 
 
 	}
 
 	static constexpr float radius = 60;
+	sf::Color color = Color::BLUEPRINT;
+
 
 	sf::Vector2f position;
 	sf::Vector2f velocity;
 	sf::Vector2f acceleration;
 
 	float mass = 100.0f;
-	float drag = 0.001f;
+	float drag = 0.01f;
 
 
 };
@@ -120,6 +127,9 @@ public:
 
 		// Init background
 		setupVertexBuffer(borderAndBGRect, xPos, yPos, width, height, Color::EIGENGRAU);
+
+		// Init ball storage
+		listOfBalls.push_back(&ball);
 		
 		// Initialize screenSpacePartition
 		screenSpacePartition.resize(sSPWidth, std::vector<std::vector<Ball*>>(sSPHeight));
@@ -188,10 +198,12 @@ public:
 
 private:
 
-	std::vector<std::vector<std::vector<Ball*>>> screenSpacePartition;
+	std::vector<std::vector<std::vector<Ball*>>> screenSpacePartition; // Uniform grid, maybe try quadtree?
 	static constexpr int sSPGridSize = 1.5 * Ball::radius;
 	static constexpr int sSPWidth = ((initScreenWidth - 8) / sSPGridSize) + 1;
 	static constexpr int sSPHeight = ((initScreenHeight - 8) / sSPGridSize) + 1;
+
+	std::vector<Ball*> listOfBalls;
 
 
 	sf::Clock clock;
@@ -208,6 +220,11 @@ private:
 	sf::VertexBuffer borderAndBGRect;
 
 	Ball ball;
+	Ball* draggedBall = nullptr;
+	float dragOffsetX;
+	float dragOffsetY;
+	sf::Vector2f mousePosPrev = zeroVector;
+	sf::Vector2f movedDistance;
 
 	void initFont() {
 		font.loadFromFile(".\\Montserrat-Regular.ttf");
@@ -225,15 +242,17 @@ private:
 				window.close();
 				running = false;
 				break;
-			/*case sf::Event::MouseButtonPressed:
+			case sf::Event::MouseButtonPressed:
 				if (event.mouseButton.button == sf::Mouse::Left) {
 					sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-					for (Ball& ball : listOfBalls) {
-						if (ball.contains(mousePos.x, mousePos.y)) {
-							ball.color = Color::BLUE;
-							ball.isDragging = true;
-							dragOffsetX = mousePos.x - ball.xPos;
-							dragOffsetY = mousePos.y - ball.yPos;
+					for (Ball* ball : listOfBalls) {
+						if (ball->contains(mousePos.x, mousePos.y)) {
+							ball->color = Color::BLUE;
+							ball->acceleration - ball->applyForce();
+							ball->velocity = zeroVector;
+							draggedBall = ball; // Get the address of the ball that is being dragged
+							dragOffsetX = mousePos.x - ball->position.x;
+							dragOffsetY = mousePos.y - ball->position.y;
 							break;
 						}
 					}
@@ -241,31 +260,40 @@ private:
 				break;
 			case sf::Event::MouseButtonReleased:
 				if (event.mouseButton.button == sf::Mouse::Left) {
-					for (Ball& ball : listOfBalls) {
-						ball.color = Color::BLUEPRINT;
-						ball.isDragging = false;
+					if (draggedBall != nullptr) {
+						draggedBall->color = Color::BLUEPRINT;
+						draggedBall->velocity = movedDistance / deltaTime / 12.0f;
+						draggedBall = nullptr; // Reset the pointer after releasing
 					}
 				}
 				break;
 			case sf::Event::MouseMoved:
-				for (Ball& ball : listOfBalls) {
-					dragBall(ball);
-				}
-				break;*/
-
-				/*case sf::Event::KeyPressed:
-					if (event.key.scancode == sf::Keyboard::Scan::Space) {
-						jiggle();
+				if (draggedBall != nullptr) { // Only drag if a ball is being dragged
+					for (Ball* ball : listOfBalls) {
+						if (ball == draggedBall) {
+							draggedBall->acceleration -= draggedBall->applyForce();
+						}
 					}
-					break;
-				*/
+					dragBall(); 
+				}
+				break;
+			default: 
+			
+			
+				if (draggedBall != nullptr) {
+					for (Ball* ball : listOfBalls) {
+						if (ball == draggedBall) {
+							draggedBall->acceleration -= draggedBall->applyForce();
+						}
+					}
+				}
 			}
 		}
 	}
 
 	void updateLogic() {
 
-		ball.update(totalTime,4* deltaTime); // 4 makes the sim run 4 times faster but costs precision
+		ball.update(totalTime, 4 * deltaTime); // 4 makes the sim run 4 times faster but costs precision
 		updatePartition();
 		checkBoundaryCollision();
 
@@ -286,9 +314,7 @@ private:
 
 	}
 
-	void checkBoundaryCollision() {
-		// Check extreme edge cells only
-
+	void checkBoundaryCollision() { // Checks extreme edge cells only, treats boundaries as having infinite mass
 		// First and last columns (x = 0 and x = maxX)
 		const auto& frontCol = screenSpacePartition[0]; // First column (x = 0)
 		const auto& backCol = screenSpacePartition[screenSpacePartition.size() - 1]; // Last column (x = maxX)
@@ -297,8 +323,8 @@ private:
 		for (const auto& cell : frontCol) {
 			for (const auto& ballPtr : cell) {
 				if (ballPtr != nullptr) {
-					if (ballPtr->position.x <= (borderSize + Ball::radius)) {
-						ballPtr->position.x = borderSize + Ball::radius; // Correct the position
+					if (ballPtr->position.x <= (borderSize + ball.radius)) {
+						ballPtr->position.x = borderSize + ball.radius; // Correct the position
 						ballPtr->velocity.x = -ballPtr->velocity.x; // Invert the velocity
 					}
 				}
@@ -309,8 +335,8 @@ private:
 		for (const auto& cell : backCol) {
 			for (const auto& ballPtr : cell) {
 				if (ballPtr != nullptr) {
-					if (ballPtr->position.x >= (initScreenWidth - borderSize - Ball::radius)) {
-						ballPtr->position.x = initScreenWidth - borderSize - Ball::radius; // Correct the position
+					if (ballPtr->position.x >= (initScreenWidth - borderSize - ball.radius)) {
+						ballPtr->position.x = initScreenWidth - borderSize - ball.radius; // Correct the position
 						ballPtr->velocity.x = -ballPtr->velocity.x; // Invert the velocity
 					}
 				}
@@ -325,8 +351,8 @@ private:
 			// Iterate through each ball in the first row of each column
 			for (const auto& ballPtr : frontRow) {
 				if (ballPtr != nullptr) {
-					if (ballPtr->position.y <= (borderSize + Ball::radius)) {
-						ballPtr->position.y = borderSize + Ball::radius; // Correct the position
+					if (ballPtr->position.y <= (borderSize + ball.radius)) {
+						ballPtr->position.y = borderSize + ball.radius; // Correct the position
 						ballPtr->velocity.y = -ballPtr->velocity.y; // Invert the velocity
 					}
 				}
@@ -335,8 +361,8 @@ private:
 			// Iterate through each ball in the last row of each column
 			for (const auto& ballPtr : backRow) {
 				if (ballPtr != nullptr) {
-					if (ballPtr->position.y >= (initScreenHeight - borderSize - Ball::radius)) {
-						ballPtr->position.y = initScreenHeight - borderSize - Ball::radius; // Correct the position
+					if (ballPtr->position.y >= (initScreenHeight - borderSize - ball.radius)) {
+						ballPtr->position.y = initScreenHeight - borderSize - ball.radius; // Correct the position
 						ballPtr->velocity.y = -ballPtr->velocity.y; // Invert the velocity
 					}
 				}
@@ -344,13 +370,31 @@ private:
 		}
 	}
 
+	void dragBall() {
+		const sf::Vector2i& mousePos = sf::Mouse::getPosition(window);
+		movedDistance = sf::Vector2f(mousePos) - mousePosPrev;
+		mousePosPrev = sf::Vector2f(mousePos);
 
 
-	void renderWorld() {
+		// Calculate the boundaries considering the size of the dragged ball
+		int maxXPos = window.getSize().x - draggedBall->radius;
+		int maxYPos = window.getSize().y - draggedBall->radius;
+
+		// Ensure the mouse position stays within the window bounds
+		int newXPos = std::max(0, std::min(mousePos.x, maxXPos));
+		int newYPos = std::max(0, std::min(mousePos.y, maxYPos));
+
+		// Update the position of the dragged ball
+		draggedBall->position = sf::Vector2f(newXPos, newYPos);
+	}
+
+
+
+	void renderWorld() const {
 		window.draw(borderAndBGRect);
 	}
 
-	void renderAll() {
+	void renderAll() const {
 		renderWorld();
 		ball.render();
 	}
