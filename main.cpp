@@ -196,6 +196,11 @@ public:
 
 private:
 
+	std::vector<std::vector<std::vector<Ball*>>> screenSpacePartition;
+	static constexpr int sSPGridSize = 120;
+	static constexpr int sSPWidth = ((initScreenWidth - 8) / sSPGridSize) + 1;
+	static constexpr int sSPHeight = ((initScreenHeight - 8) / sSPGridSize) + 1;
+
 
 	sf::Clock clock;
 
@@ -207,8 +212,6 @@ private:
 	int frameCount = 0;
 
 	bool running = true;
-
-	static constexpr int numBalls = 10;
 
 	sf::VertexBuffer borderAndBGRect;
 
@@ -268,21 +271,25 @@ private:
 		}
 	}
 
-
-	//void dragBall(Ball& ball) {
-	//	if (ball.isDragging) {
-	//		const sf::Vector2i& mousePos = sf::Mouse::getPosition(window);
-
-	//		// Putting boundary checking here caused ball overlapping problems
-	//		ball.setPosition(mousePos.x - dragOffsetX, mousePos.y - dragOffsetY);
-	//	}
-	//}
-
-
 	void updateLogic() {
 
 		ball.update(totalTime, deltaTime);
 		collisionChecking();
+
+	}
+
+	void updatePartition() { // Necessary for many balls, sorta silly with just one
+		for (std::vector<std::vector<Ball*>>& column : screenSpacePartition) {
+			for (std::vector<Ball*>& cell : column) {
+				cell.clear();
+			}
+		}
+
+		int cellX = static_cast<int>(ball.position.x / sSPGridSize);
+		int cellY = static_cast<int>(ball.position.y / sSPGridSize);
+		if (cellX >= 0 && cellX < sSPWidth && cellY >= 0 && cellY < sSPHeight) {
+			screenSpacePartition[cellX][cellY].push_back(&ball);
+		}
 
 	}
 
@@ -291,7 +298,49 @@ private:
 	}
 
 	void checkBoundaryCollision(Ball& ball) {
-		
+		// Check extreme edge cells only
+
+	// First and last columns (x = 0 and x = maxX)
+		const auto& frontCol = screenSpacePartition[0]; // First column (x = 0)
+		const auto& backCol = screenSpacePartition[screenSpacePartition.size() - 1]; // Last column (x = maxX)
+
+		// Iterate through each cell in the first column
+		for (const auto& cell : frontCol) {
+			for (const auto& ballPtr : cell) {
+				if (ballPtr) {
+					
+				}
+			}
+		}
+
+		// Iterate through each cell in the last column
+		for (const auto& cell : backCol) {
+			for (const auto& ballPtr : cell) {
+				if (ballPtr) {
+					
+				}
+			}
+		}
+
+		// First and last rows (y = 0 and y = maxY) in all columns
+		for (const auto& col : screenSpacePartition) {
+			const auto& frontRow = col[0]; // First row in each column (y = 0)
+			const auto& backRow = col[col.size() - 1]; // Last row in each column (y = maxY)
+
+			// Iterate through each ball in the first row of each column
+			for (const auto& ballPtr : frontRow) {
+				if (ballPtr) {
+					
+				}
+			}
+
+			// Iterate through each ball in the last row of each column
+			for (const auto& ballPtr : backRow) {
+				if (ballPtr) {
+					
+				}
+			}
+		}
 
 	}
 
