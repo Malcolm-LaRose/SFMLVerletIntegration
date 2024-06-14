@@ -24,7 +24,27 @@
 
 std::mt19937 gen(std::random_device{}());
 constexpr float PI = 3.141592;
-const sf::Color fillColor = Color::BLUEPRINT;
+const sf::Color& fillColor = Color::BLUEPRINT;
+const sf::Vector2f& zeroVector = sf::Vector2f(0.0f, 0.0f);
+
+static constexpr short borderSize = 4;
+
+static constexpr int xPos = borderSize;
+static constexpr int yPos = borderSize;
+
+static constexpr short targetFPS = 60;
+static constexpr int initScreenWidth = 1920;
+static constexpr int initScreenHeight = 1080;
+
+static constexpr int width = initScreenWidth - (2 * borderSize);
+static constexpr int height = initScreenHeight - (2 * borderSize);
+
+sf::RenderWindow window;
+
+sf::Font font;
+
+static const sf::Vector2f screenCenter = sf::Vector2f(initScreenWidth / 2.0f, initScreenHeight / 2.0f);
+
 
 int genRandomInt(int min, int max) {
 	std::uniform_int_distribution<int> dist(min, max);
@@ -36,16 +56,18 @@ const sf::Vector2f& vectorSquared(const sf::Vector2f& input) { // Component-wise
 }
 
 const sf::Vector2f& multiplyVectorByScalar(const float& scalar, const sf::Vector2f& vector) {
-	
+	return sf::Vector2f(scalar * vector.x, scalar * vector.y);
 }
 
 
-float deltaTime = 0.001; // Framerate adjustable time step
+float deltaTime = 0.016; // Framerate adjustable time step
 float totalTime = 0.0;
 
 
 
 struct Ball {
+
+	Ball() : position(screenCenter), velocity(zeroVector), acceleration(zeroVector) {}
 
 	void update(const float& totalTime, const float& dT) {
 
@@ -59,6 +81,13 @@ struct Ball {
 		
 	}
 
+	void render() const {
+		sf::CircleShape ball = sf::CircleShape(60,36);
+		ball.setPosition(position);
+
+		window.draw(ball);
+	}
+
 
 	const sf::Vector2f& applyForce() const {
 		
@@ -67,7 +96,6 @@ struct Ball {
 		sf::Vector2f dragAcc = sf::Vector2f(multiplyVectorByScalar(1.0f/mass, dragForce));
 		return gravity - dragAcc;
 
-
 	}
 
 	
@@ -75,8 +103,8 @@ struct Ball {
 	sf::Vector2f velocity;
 	sf::Vector2f acceleration;
 
-	float mass;
-	float drag;
+	float mass = 10.0f;
+	float drag = 0.001f;
 
 
 };
@@ -90,15 +118,12 @@ public:
 		window.create(sf::VideoMode(initScreenWidth, initScreenHeight), "Physics Box", sf::Style::Titlebar | sf::Style::Close);
 		window.setKeyRepeatEnabled(false);
 		window.setVerticalSyncEnabled(false); // Probably ignored by driver
-		window.setFramerateLimit(targetFPS); // Comment out to unlimit framerate
+		//window.setFramerateLimit(targetFPS); // Comment out to unlimit framerate
 
 
 		// Init background
 		setupVertexBuffer(borderAndBGRect, xPos, yPos, width, height, Color::EIGENGRAU);
 		
-
-		// Init balls
-
 
 		// Init Font
 		initFont();
@@ -156,9 +181,11 @@ public:
 			renderAll();
 
 			frameTime = clock.restart().asMicroseconds();
+			deltaTime = frameTime / 1000000.0f;
 			totalFrameTime += frameTime;
+			totalTime += deltaTime;
 
-			frameCounterDisplay(frameTime, frameCount / (totalFrameTime / 1000000));
+			frameCounterDisplay(frameTime, frameCount / (totalFrameTime / 1000000.0f));
 			frameCount++;
 			window.display();
 
@@ -169,6 +196,9 @@ public:
 
 private:
 
+
+	sf::Clock clock;
+
 	float frameTime = 0;
 	float totalFrameTime = 0;
 
@@ -178,29 +208,11 @@ private:
 
 	bool running = true;
 
-	static constexpr short borderSize = 4;
-
-	static constexpr int xPos = borderSize;
-	static constexpr int yPos = borderSize;
-
-	static constexpr short targetFPS = 60;
-	static constexpr int initScreenWidth = 1920;
-	static constexpr int initScreenHeight = 1080;
-
-	static constexpr int width = initScreenWidth - (2 * borderSize);
-	static constexpr int height = initScreenHeight - (2 * borderSize);
-
 	static constexpr int numBalls = 10;
 
 	sf::VertexBuffer borderAndBGRect;
 
-	std::array<Ball, numBalls> listOfBalls; // Any better data structures to use? Can I combine this with ssp?
-
-	sf::RenderWindow window;
-
-	sf::Clock clock;
-
-	sf::Font font;
+	Ball ball;
 
 	void initFont() {
 		font.loadFromFile(".\\Montserrat-Regular.ttf");
@@ -269,8 +281,7 @@ private:
 
 	void updateLogic() {
 
-		// gravity();
-
+		ball.update(totalTime, deltaTime);
 		collisionChecking();
 
 	}
@@ -284,17 +295,6 @@ private:
 
 	}
 
-	bool pointContainsBall(const float& x, const float& y, const float& sDist) {
-
-
-	}
-
-	void checkCollisionCheap(Ball& ball) {
-
-	}
-
-
-
 
 	void renderWorld() {
 		window.draw(borderAndBGRect);
@@ -307,47 +307,9 @@ private:
 	static constexpr float angleStep = 2 * PI / numSegments;
 
 
-	//void renderBalls() {
-
-	//	// Prepare the vertex array to hold all the triangles
-	//	sf::VertexArray vertices(sf::Triangles, listOfBalls.size() * 3 * numSegments);
-
-	//	// Populate the vertex array with the vertices of each ball
-	//	for (size_t i = 0; i < listOfBalls.size(); ++i) {
-	//		Ball& ball = listOfBalls[i];
-
-	//		const sf::Vector2f& position = ball.getPosition();
-	//		const float& radius = ball.radius;
-
-	//		// Iterate over each segment and create triangles
-	//		for (int j = 0; j < numSegments; ++j) {
-	//			// Calculate the angle of the current segment
-	//			const float& angle1 = j * angleStep;
-	//			const float& angle2 = (j + 1) * angleStep;
-
-	//			// Calculate the vertices of the triangle
-	//			const sf::Vector2f vertex1(position.x, position.y);
-	//			const sf::Vector2f vertex2(position.x + radius * std::cos(angle1), position.y + radius * std::sin(angle1));
-	//			const sf::Vector2f vertex3(position.x + radius * std::cos(angle2), position.y + radius * std::sin(angle2));
-	//			
-	//			// Set the vertices of the triangle in the vertex array
-	//			vertices[i * numSegments * 3 + j * 3].position = vertex1;
-	//			vertices[i * numSegments * 3 + j * 3].color = ball.color;
-	//			vertices[i * numSegments * 3 + j * 3 + 1].position = vertex2;
-	//			vertices[i * numSegments * 3 + j * 3 + 1].color = ball.color;
-	//			vertices[i * numSegments * 3 + j * 3 + 2].position = vertex3;
-	//			vertices[i * numSegments * 3 + j * 3 + 2].color = ball.color;
-	//		}
-	//	}
-
-	//	// Draw all the triangles at once
-	//	window.draw(vertices);
-	//}
-
-
 	void renderAll() {
 		renderWorld();
-		// renderBalls();
+		ball.render();
 	}
 
 };
