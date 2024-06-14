@@ -1,10 +1,5 @@
 // THE PLAN
 // 
-// Learn stack vs. heap
-// std::array -> c style array
-// Optimize ball collision by only checking in neighborhood around ball for 'ball2'
-// Fix collision skipping --> Multiple 'physics frames' per 'render frame' 
-// Dont rerender pixels that didnt change? esp background and border
 // Real physics
 // ????
 // Profit
@@ -82,7 +77,7 @@ struct Ball {
 	}
 
 	void render() const {
-		sf::CircleShape ball = sf::CircleShape(60,36);
+		sf::CircleShape ball = sf::CircleShape(radius,38);
 		ball.setPosition(position);
 
 		window.draw(ball);
@@ -98,7 +93,8 @@ struct Ball {
 
 	}
 
-	
+	static constexpr float radius = 60;
+
 	sf::Vector2f position;
 	sf::Vector2f velocity;
 	sf::Vector2f acceleration;
@@ -124,6 +120,8 @@ public:
 		// Init background
 		setupVertexBuffer(borderAndBGRect, xPos, yPos, width, height, Color::EIGENGRAU);
 		
+		// Initialize screenSpacePartition
+		screenSpacePartition.resize(sSPWidth, std::vector<std::vector<Ball*>>(sSPHeight));
 
 		// Init Font
 		initFont();
@@ -156,13 +154,6 @@ public:
 		vertexBuffer.update(vertices);
 
 
-	}
-
-	void placeNRandomBalls() {
-		int i = 0;
-		while (i < numBalls) {
-
-		}
 	}
 
 
@@ -274,7 +265,8 @@ private:
 	void updateLogic() {
 
 		ball.update(totalTime, deltaTime);
-		collisionChecking();
+		updatePartition();
+		checkBoundaryCollision();
 
 	}
 
@@ -293,22 +285,21 @@ private:
 
 	}
 
-	void collisionChecking() {
-		
-	}
-
-	void checkBoundaryCollision(Ball& ball) {
+	void checkBoundaryCollision() {
 		// Check extreme edge cells only
 
-	// First and last columns (x = 0 and x = maxX)
+		// First and last columns (x = 0 and x = maxX)
 		const auto& frontCol = screenSpacePartition[0]; // First column (x = 0)
 		const auto& backCol = screenSpacePartition[screenSpacePartition.size() - 1]; // Last column (x = maxX)
 
 		// Iterate through each cell in the first column
 		for (const auto& cell : frontCol) {
 			for (const auto& ballPtr : cell) {
-				if (ballPtr) {
-					
+				if (ballPtr != nullptr) {
+					if (ballPtr->position.x <= (borderSize + Ball::radius)) {
+						ballPtr->position.x = borderSize + Ball::radius; // Correct the position
+						ballPtr->velocity.x = -ballPtr->velocity.x; // Invert the velocity
+					}
 				}
 			}
 		}
@@ -316,8 +307,11 @@ private:
 		// Iterate through each cell in the last column
 		for (const auto& cell : backCol) {
 			for (const auto& ballPtr : cell) {
-				if (ballPtr) {
-					
+				if (ballPtr != nullptr) {
+					if (ballPtr->position.x >= (initScreenWidth - borderSize - Ball::radius)) {
+						ballPtr->position.x = initScreenWidth - borderSize - Ball::radius; // Correct the position
+						ballPtr->velocity.x = -ballPtr->velocity.x; // Invert the velocity
+					}
 				}
 			}
 		}
@@ -329,32 +323,31 @@ private:
 
 			// Iterate through each ball in the first row of each column
 			for (const auto& ballPtr : frontRow) {
-				if (ballPtr) {
-					
+				if (ballPtr != nullptr) {
+					if (ballPtr->position.y <= (borderSize + Ball::radius)) {
+						ballPtr->position.y = borderSize + Ball::radius; // Correct the position
+						ballPtr->velocity.y = -ballPtr->velocity.y; // Invert the velocity
+					}
 				}
 			}
 
 			// Iterate through each ball in the last row of each column
 			for (const auto& ballPtr : backRow) {
-				if (ballPtr) {
-					
+				if (ballPtr != nullptr) {
+					if (ballPtr->position.y >= (initScreenHeight - borderSize - Ball::radius)) {
+						ballPtr->position.y = initScreenHeight - borderSize - Ball::radius; // Correct the position
+						ballPtr->velocity.y = -ballPtr->velocity.y; // Invert the velocity
+					}
 				}
 			}
 		}
-
 	}
+
 
 
 	void renderWorld() {
 		window.draw(borderAndBGRect);
 	}
-
-	// Num triangles used to render the circles
-	static constexpr int numSegments = 12;
-
-	// Calculate the angle between each segment
-	static constexpr float angleStep = 2 * PI / numSegments;
-
 
 	void renderAll() {
 		renderWorld();
