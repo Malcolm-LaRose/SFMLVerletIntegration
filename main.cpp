@@ -24,8 +24,8 @@ const sf::Vector2f& zeroVector = sf::Vector2f(0.0f, 0.0f);
 
 static constexpr short borderSize = 4;
 
-static constexpr int xPos = borderSize;
-static constexpr int yPos = borderSize;
+static constexpr short xPos = borderSize;
+static constexpr short yPos = borderSize;
 
 static constexpr short targetFPS = 60;
 static constexpr int initScreenWidth = 1920;
@@ -78,6 +78,7 @@ struct Ball {
 
 	void render() const {
 		sf::CircleShape ball = sf::CircleShape(radius,38);
+		ball.setOrigin(radius,radius);
 		ball.setPosition(position);
 
 		window.draw(ball);
@@ -99,7 +100,7 @@ struct Ball {
 	sf::Vector2f velocity;
 	sf::Vector2f acceleration;
 
-	float mass = 10.0f;
+	float mass = 100.0f;
 	float drag = 0.001f;
 
 
@@ -188,7 +189,7 @@ public:
 private:
 
 	std::vector<std::vector<std::vector<Ball*>>> screenSpacePartition;
-	static constexpr int sSPGridSize = 120;
+	static constexpr int sSPGridSize = 1.5 * Ball::radius;
 	static constexpr int sSPWidth = ((initScreenWidth - 8) / sSPGridSize) + 1;
 	static constexpr int sSPHeight = ((initScreenHeight - 8) / sSPGridSize) + 1;
 
@@ -264,7 +265,7 @@ private:
 
 	void updateLogic() {
 
-		ball.update(totalTime, deltaTime);
+		ball.update(totalTime,4* deltaTime); // 4 makes the sim run 4 times faster but costs precision
 		updatePartition();
 		checkBoundaryCollision();
 
