@@ -51,11 +51,11 @@ const sf::Vector2f& vectorSquared(const sf::Vector2f& input) { // Component-wise
 }
 
 const sf::Vector2f& multiplyVectorByScalar(const float& scalar, const sf::Vector2f& vector) {
-	return sf::Vector2f(scalar * vector.x, scalar * vector.y);
+	return sf::Vector2f(scalar * vector);
 }
 
 
-float deltaTime = 0.001; // Framerate adjustable time step
+float deltaTime = 0.0001; // Framerate adjustable time step
 float totalTime = 0.0;
 
 
@@ -66,14 +66,23 @@ struct Ball {
 
 	void update(const float& totalTime, const float& dT) {
 
-		sf::Vector2f updatedPos = position + velocity * dT + acceleration * (dT * dT) * 0.5f;
-		sf::Vector2f updatedAcc = applyForce(); 
+		sf::Vector2f updatedPos = position + (velocity * dT) + acceleration * (dT * dT) * 0.5f;
+		sf::Vector2f updatedAcc = applyForce();
 		sf::Vector2f updatedVel = velocity + multiplyVectorByScalar((dT * 0.5f), updatedAcc + acceleration);
 
 		position = updatedPos;
 		velocity = updatedVel;
 		acceleration = updatedAcc;
 		
+	}
+
+	const sf::Vector2f& applyForce() const { // Really an acceleration
+
+		const sf::Vector2f gravity = sf::Vector2f(0.0f, 98.1f);
+		const sf::Vector2f dragForce = sf::Vector2f(multiplyVectorByScalar(drag, velocity)); // This is less FUCKED than D = 0.5 * (rho * C * Area * vel^2) it seems
+		const sf::Vector2f dragAcc = sf::Vector2f(multiplyVectorByScalar(1.0f / mass, dragForce));
+		return gravity - dragAcc;
+
 	}
 
 	void render() const {
@@ -85,18 +94,9 @@ struct Ball {
 	}
 
 	const bool contains(const int& x, const int& y) const { // Checks if a point is within a ball
-		const float distX = x - (position.x);
-		const float distY = y - (position.y);
+		const float& distX = x - (position.x);
+		const float& distY = y - (position.y);
 		return (distX * distX + distY * distY) <= (radius * radius);
-	}
-
-	const sf::Vector2f& applyForce() const { // Really an acceleration
-		
-		sf::Vector2f gravity = sf::Vector2f(0.0f, 9.81f);
-		sf::Vector2f dragForce = sf::Vector2f(multiplyVectorByScalar(0.5f * drag , vectorSquared(velocity)));
-		sf::Vector2f dragAcc = sf::Vector2f(multiplyVectorByScalar(1.0f/mass, dragForce));
-		return gravity - dragAcc; 
-
 	}
 
 	static constexpr float radius = 60;
@@ -107,8 +107,8 @@ struct Ball {
 	sf::Vector2f velocity;
 	sf::Vector2f acceleration;
 
-	float mass = 100.0f;
-	float drag = 0.01f;
+	float mass = 1.0f;
+	float drag = 0.1;
 
 
 };
@@ -168,7 +168,7 @@ public:
 	}
 
 
-	void frameCounterDisplay(const float& frameTime, const float& avg) {
+	void frameCounterDisplay(const int& frameTime, const int& avg) {
 		frameText.setString("FrameTime (us): " + std::to_string(frameTime) + "\nAvg. FPS: " + std::to_string(avg));
 
 		window.draw(frameText);
@@ -228,6 +228,7 @@ private:
 
 	void initFont() {
 		font.loadFromFile(".\\Montserrat-Regular.ttf");
+		font.setSmooth(false);
 		frameText.setCharacterSize(34);
 		frameText.setFillColor(Color::WHITE);
 		frameText.setFont(font);
@@ -262,7 +263,7 @@ private:
 				if (event.mouseButton.button == sf::Mouse::Left) {
 					if (draggedBall != nullptr) {
 						draggedBall->color = Color::BLUEPRINT;
-						draggedBall->velocity = movedDistance / deltaTime / 12.0f;
+						draggedBall->velocity = movedDistance / deltaTime / 100.0f;
 						draggedBall = nullptr; // Reset the pointer after releasing
 					}
 				}
