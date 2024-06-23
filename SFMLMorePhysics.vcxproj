@@ -24,6 +24,7 @@
     <ProjectGuid>{eefd67ce-9a01-4dc8-836d-c868e92febcc}</ProjectGuid>
     <RootNamespace>SFMLMorePhysics</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Brickout</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
